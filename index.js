@@ -89,6 +89,7 @@ const typeDefs = gql`
     author: String!
     published: Int
     genres: [String]
+    id: String
   }
 
   type Author {
@@ -142,7 +143,7 @@ const resolvers = {
         const author = { name: args.author, id: uuid() }
         authors = authors.concat(author)
       }
-      const book = { ...args }
+      const book = { ...args, id: uuid() }
       books = books.concat(book)
       return book
     },
