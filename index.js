@@ -1,4 +1,4 @@
-const { ApolloServer, gql } = require('apollo-server')
+const { ApolloServer, UserInputError, gql } = require('apollo-server')
 const mongoose = require('mongoose')
 const Book = require('./models/book')
 const Author = require('./models/author')
@@ -7,7 +7,9 @@ mongoose.set('useFindAndModify', false)
 
 const MONGODB_URI = 'mongodb+srv://Vanamo:sala1nen@cluster0-qecn1.mongodb.net/test?retryWrites=true&w=majority'
 
-mongoose.connect(MONGODB_URI, { useNewUrlParse: true })
+console.log("commecting to", MONGODB_URI)
+
+mongoose.connect(MONGODB_URI, { useNewUrlParser: true })
   .then(() => {
     console.log("connected to MongoDB")
   })
@@ -101,8 +103,8 @@ let books = [
 const typeDefs = gql`
   type Book {
     title: String!
-    author: Author!
     published: Int!
+    author: Author!
     genres: [String!]!
     id: ID!
   }
@@ -116,14 +118,14 @@ const typeDefs = gql`
   type Query {
     bookCount: Int!
     authorCount: Int!
-    allBooks(author: String, genre: String): [Book]
+    allBooks(author: String, genre: String): [Book!]!
     allAuthors: [Author]
   }
 
   type Mutation {
     addBook(
       title: String!
-      author: Author!
+      author: String!
       published: Int!
       genres: [String!]!
     ): Book
@@ -141,15 +143,32 @@ const resolvers = {
     allBooks: (root, args) => {
       return Book.find({})
     },
-    allAuthors: () => authors
+    allAuthors: (root, args) => {
+      return Author.find({})
+    },
   },
   Author: {
     bookCount: (root) => { return books.filter(b => b.author === root.name).length }
   },
+  Book: {
+    author: (root) => {
+      return {
+        name: root.name
+      }
+    }
+  },
   Mutation: {
-    addBook: (root, args) => {
-      const author = authors.find(a => a.name === args.author)
+    addBook: async (root, args) => {
+      const author = Author.find({ name: args.author })
       const book = new Book({ ...args, author })
+
+      try {
+        await book.save()
+      } catch (error) {
+        throw new UserInputError(error.message, {
+          invalidArgs: args,
+        })
+      }
       return book
     },
     editAuthor: (root, args) => {
