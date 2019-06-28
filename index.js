@@ -113,13 +113,14 @@ const typeDefs = gql`
     name: String!
     born: Int
     bookCount: Int
+    id: ID!
   }
 
   type Query {
     bookCount: Int!
     authorCount: Int!
     allBooks(author: String, genre: String): [Book!]!
-    allAuthors: [Author]
+    allAuthors: [Author!]!
   }
 
   type Mutation {
@@ -141,7 +142,7 @@ const resolvers = {
     bookCount: () => Book.collection.countDocuments(),
     authorCount: () => authors.length,
     allBooks: (root, args) => {
-      return Book.find({})
+      return Book.find({}).populate("author")
     },
     allAuthors: (root, args) => {
       return Author.find({})
@@ -159,7 +160,17 @@ const resolvers = {
   },
   Mutation: {
     addBook: async (root, args) => {
-      const author = Author.find({ name: args.author })
+      let author = await Author.findOne({ name: args.author })
+      if (!author) {
+        author = new Author({ name: args.author })
+        try {
+          await author.save()
+        } catch (error) {
+          throw new UserInputError(error.message, {
+            invalidArgs: args,
+          })
+        }
+      }
       const book = new Book({ ...args, author })
 
       try {
@@ -169,7 +180,8 @@ const resolvers = {
           invalidArgs: args,
         })
       }
-      return book
+      const newBook = await Book.findOne({ title: book.title }).populate("author")
+      return newBook
     },
     editAuthor: (root, args) => {
       const author = authors.find(a => a.name === args.name)
